@@ -1,0 +1,22 @@
+tamanho = '000.111.222-33'
+tam = 'abc'
+def verificar_cpf(cpf):
+    cpfsplit = cpf.split('.')
+    if len(cpf) > len(tamanho):
+        print('cpf incorreto1')
+    elif cpf.count('.') < 2:
+        print('cpf incorreto2')
+    elif cpf.count('-') < 1:
+        print('cpf incorreto3')
+    elif len(cpfsplit[0]) < len(tam):
+        print('cpf incorreto4')
+    else:
+        print('cpf correto')
+
+verificar_cpf('123.456.789-01')
+verificar_cpf('000.111.222-33')
+verificar_cpf('123.456.789-01 ')
+verificar_cpf('123 456 789-01')
+verificar_cpf('123.456.789 01')
+verificar_cpf('12345678901')
+verificar_cpf('12.34.56-78901')
