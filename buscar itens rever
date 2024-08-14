@@ -1,5 +1,15 @@
 ingredientes = ['requeijao','queijo Mozzarella','Queijo']
-def buscar(letra):
-    if letra in ingredientes:
-        print('ss')
-letra = input()
+letra = input('Digite uma letrae buscaremos se existe nos ingredientes: ')
+
+for tent < 4:
+    if letra in ingredientes[0]:
+        print(ingredientes[0])
+        tent +=1
+    elif letra in ingredientes[1]:
+        print(ingredientes[1])
+        tent += 1
+    elif letra in ingredientes[2]:
+        print(ingredientes[2])
+        tent += 1
+    else:
+        print('item não encontrado')
