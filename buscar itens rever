@@ -1,0 +1,5 @@
+ingredientes = ['requeijao','queijo Mozzarella','Queijo']
+def buscar(letra):
+    if letra in ingredientes:
+        print('ss')
+letra = input()
