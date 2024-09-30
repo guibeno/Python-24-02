@@ -1,0 +1,6 @@
+def cadastro_restaurante():
+    nome = input('nome do restaurante: ')
+    comissao = input('comissao do restaurante: ')
+    email = input('email do restaurante: ')
+    senha = input('senha do restaurante: ')
+cadastro_restaurante()
