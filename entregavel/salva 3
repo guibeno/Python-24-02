@@ -1,0 +1,67 @@
+def login_cadastro():
+    resp = input('Digite 0 para cadastro ou 1 para login')
+    while resp != '0' and resp != '1':
+        resp = (input('Digite uma opção válida, entre login, ou  0  para cadastro: '))
+    lista_email = []
+    lista_senha = []
+    if resp == '0':
+        nome = input('nome do restaurante: ')
+        while len(nome) < 10:
+            nome = input('Digite o nome do restaurante corretamente com mais de 10 caracteres: ')
+        comissao = input('comissao do restaurante: ')
+        email = input('email do restaurante: ')
+        senha = input('senha do restaurante: ')
+        lista_email.append(email)
+        lista_senha.append(senha)
+    else:
+        login_email = input('Digite seu email: ')
+        if login_email in lista_email:
+            print('email correto!')
+            login_senha = input('Digite sua senha: ')
+            if login_senha in lista_senha:
+                print('senha correto!')
+login_cadastro()def login_cadastro():
+    resp = input('Digite 0 para cadastro ou 1 para login')
+    while resp != '0' and resp != '1':
+        resp = (input('Digite uma opção válida, entre login, ou  0  para cadastro: '))
+    lista_email = []
+    lista_senha = []
+    if resp == '0':
+        nome = input('nome do restaurante: ')
+        while len(nome) < 10:
+            nome = input('Digite o nome do restaurante corretamente com mais de 10 caracteres: ')
+        comissao = input('comissao do restaurante: ')
+        email = input('email do restaurante: ')
+        senha = input('senha do restaurante: ')
+        lista_email.append(email)
+        lista_senha.append(senha)
+    else:
+        login_email = input('Digite seu email: ')
+        if login_email in lista_email:
+            print('email correto!')
+            login_senha = input('Digite sua senha: ')
+            if login_senha in lista_senha:
+                print('senha correto!')
+login_cadastro()def login_cadastro():
+    resp = input('Digite 0 para cadastro ou 1 para login')
+    while resp != '0' and resp != '1':
+        resp = (input('Digite uma opção válida, entre login, ou  0  para cadastro: '))
+    lista_email = []
+    lista_senha = []
+    if resp == '0':
+        nome = input('nome do restaurante: ')
+        while len(nome) < 10:
+            nome = input('Digite o nome do restaurante corretamente com mais de 10 caracteres: ')
+        comissao = input('comissao do restaurante: ')
+        email = input('email do restaurante: ')
+        senha = input('senha do restaurante: ')
+        lista_email.append(email)
+        lista_senha.append(senha)
+    else:
+        login_email = input('Digite seu email: ')
+        if login_email in lista_email:
+            print('email correto!')
+            login_senha = input('Digite sua senha: ')
+            if login_senha in lista_senha:
+                print('senha correto!')
+login_cadastro()
