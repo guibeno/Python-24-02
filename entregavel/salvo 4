@@ -1,0 +1,35 @@
+import re
+
+def login_cadastro():
+    resp = input('Digite 0 para cadastro ou 1 para login')
+    while resp != '0' and resp != '1':
+        resp = (input('Digite uma opção válida, entre login, ou  0  para cadastro: '))
+    lista_email = ['123']
+    lista_senha = ['123']
+    if resp == '0':
+        nome = input('nome do restaurante: ')
+        while len(nome) < 10:
+            nome = input('Digite o nome do restaurante corretamente com mais de 10 caracteres: ')
+        comissao = input('comissao do restaurante: ')
+        while not comissao.isdigit() or int(comissao) <= 0:
+            print('Deve ser apenas numeros e o valor maior ou igual a 0')
+            comissao = input('comissão do restaurante')
+
+        email = input('email do restaurante: ')
+        senha = input('Digite a sua senha: ')
+
+        while len(senha) < 5 or not re.search(r'[a-z]', senha or not re.search(r'[A-Z]', senha) or not re.search(r'[0-9]', senha)):
+            print("Senha inválida. Ela deve ter pelo menos 5 caracteres.")
+            senha = input('Digite a sua senha: ')
+        print('boa')
+
+    else:
+        login_email = input('Digite seu email: ')
+        while not login_email in lista_email:
+            login_email = input('Digite seu email: ')
+        print('email correto!')
+        login_senha = input('Digite sua senha: ')
+        while not login_senha in lista_senha:
+            login_senha = input('Digite sua senha: ')
+        print('senha correta!')
+login_cadastro()
