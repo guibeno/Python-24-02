@@ -1,0 +1,17 @@
+def login_cadastro():
+    nome = input('nome do restaurante: ')
+    comissao = input('comissao do restaurante: ')
+    email = input('email do restaurante: ')
+    senha = input('senha do restaurante: ')
+    lista_email = []
+    lista_email.append(email)
+    lista_senha = []
+    lista_senha.append(senha)
+
+    login_email = input('Digite seu email: ')
+    if login_email in lista_email:
+        print('email correto!')
+        login_senha = input('Digite sua senha: ')
+        if login_senha in lista_senha:
+            print('senha correto!')
+login_cadastro()
