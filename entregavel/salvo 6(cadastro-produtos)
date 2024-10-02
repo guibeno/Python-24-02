@@ -1,0 +1,13 @@
+def cadastro_produtos():
+    resposta = input('1 - cadastro do produto\n2 - apagar produto \n3 - alterar comissao\n4 - Logout')
+    while resposta != '1' and resposta != '2' and resposta != '3' and resposta != '4':
+        print('Digite uma resposta válida!')
+        resposta = input('1 - cadastro do produto\n2 - apagar produto \n3 - alterar comissao\n4 - Logout')
+    if resposta == '1':
+        print('cadastro do produto')
+    elif resposta == '2':
+        print('apagar produto')
+    elif resposta == '3':
+        print('alterar comissao')
+
+cadastro_produtos()
