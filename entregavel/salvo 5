@@ -1,0 +1,46 @@
+import re
+
+def login_cadastro():
+    resp = input('0 - Cadastro\n1 - Login\n')
+    while resp != '0' and resp != '1':
+        resp = (input('Digite uma opção válida!\n0 - Cadastro\n1 - Login\n'))
+    lista_email = ['123']
+    lista_senha = ['123']
+    if resp == '0':
+        nome = input('nome do restaurante: ')
+        while len(nome) < 10:
+            nome = input('Digite o nome do restaurante corretamente com mais de 10 caracteres: ')
+        comissao = input('comissao do restaurante: ')
+        while not comissao.isdigit() or int(comissao) <= 0:
+            print('Deve ser apenas numeros e o valor maior ou igual a 0')
+            comissao = input('comissão do restaurante')
+
+        email = input('email do restaurante: ')
+        senha = input('Digite a sua senha: ')
+
+        while len(senha) < 5 or not re.search(r'[a-z]', senha) or not re.search(r'[A-Z]', senha) or not re.search(r'[0-9]', senha):
+            print("Senha inválida. Ela deve ter pelo menos 5 caracteres.")
+            senha = input('Digite a sua senha: ')
+        print('boa')
+        senha = senha.lower()
+
+    else:
+        login_email = input('Digite seu email: ')
+        while not login_email in lista_email:
+            login_email = input('Digite seu email: ')
+        print('email correto!')
+        login_senha = input('Digite sua senha: ')
+        while not login_senha in lista_senha:
+            login_senha = input('Digite sua senha: ')
+        print('senha correta!')
+login_cadastro()
+
+def cadastro_produtos():
+    resposta = input('1 - cadastro do produto\n2 - apagar produto \n3 - alterar comissao\n4 - Logout')
+    while resposta != '1' and resposta != '2' and resposta != '3' and resposta != '4':
+        print('Digite uma resposta válida!')
+        resposta = input('1 - cadastro do produto\n2 - apagar produto \n3 - alterar comissao\n4 - Logout')
+    if resposta == '1':
+        print('a')
+
+cadastro_produtos()
