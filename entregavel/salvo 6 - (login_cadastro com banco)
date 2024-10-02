@@ -1,0 +1,83 @@
+import re
+import sqlite3
+
+
+def criar_banco_de_dados():
+    conn = sqlite3.connect('restaurantes.db')
+    cursor = conn.cursor()
+
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS restaurantes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        comissao INTEGER NOT NULL,
+        email TEXT NOT NULL UNIQUE,
+        senha TEXT NOT NULL
+    )
+    ''')
+
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS produtos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        restaurante_id INTEGER NOT NULL,
+        nome TEXT NOT NULL,
+        preco REAL NOT NULL,
+        FOREIGN KEY (restaurante_id) REFERENCES restaurantes(id)
+    )
+    ''')
+
+    conn.commit()
+    conn.close()
+criar_banco_de_dados()
+
+
+def login_cadastro():
+    conn = sqlite3.connect('restaurantes.db')
+    cursor = conn.cursor()
+
+    resp = input('0 - Cadastro\n1 - Login\n')
+    while resp != '0' and resp != '1':
+        resp = (input('Digite uma opção válida!\n0 - Cadastro\n1 - Login\n'))
+    if resp == '0':
+        nome = input('nome do restaurante: ')
+        while len(nome) < 10:
+            nome = input('Digite o nome do restaurante corretamente com mais de 10 caracteres: ')
+        comissao = input('comissao do restaurante: ')
+        while not comissao.isdigit() or int(comissao) <= 0:
+            print('Deve ser apenas numeros e o valor maior ou igual a 0')
+            comissao = input('comissão do restaurante')
+
+        email = input('email do restaurante: ')
+        senha = input('Digite a sua senha: ')
+        email = email.lower()
+
+        while len(senha) < 5 or not re.search(r'[a-z]', senha) or not re.search(r'[A-Z]', senha) or not re.search(r'[0-9]', senha):
+            print("Senha inválida. Ela deve ter pelo menos 5 caracteres.")
+            senha = input('Digite a sua senha: ')
+        print('boa')
+
+        try:
+            cursor.execute('''
+                INSERT INTO restaurantes (nome, comissao, email, senha)
+                VALUES (?, ?, ?, ?)
+                    ''', (nome, int(comissao), email, senha))
+            conn.commit()
+            print('Cadastro realizado com sucesso!')
+        except sqlite3.IntegrityError:
+            print('Erro: Email já cadastrado.')
+
+    else:
+        login_email = input('Digite seu email: ')
+        login_senha = input('Digite sua senha: ')
+
+        cursor.execute('SELECT * FROM restaurantes WHERE email = ? AND senha = ?', (login_email, login_senha))
+        usuario = cursor.fetchone()
+
+        if usuario:
+            print('Login realizado com sucesso!')
+        else:
+            print('Email ou senha incorretos. Tente novamente.')
+
+    conn.close()
+
+login_cadastro()
