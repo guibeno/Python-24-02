@@ -1,0 +1,193 @@
+import re
+import sqlite3
+
+
+def criar_banco_de_dados():
+    conn = sqlite3.connect('restaurante4')
+    cursor = conn.cursor()
+
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS restaurantes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        comissao INTEGER NOT NULL,
+        email TEXT NOT NULL UNIQUE,
+        senha TEXT NOT NULL
+    )
+    ''')
+
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS produtos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        restaurante_id INTEGER,
+        nome TEXT NOT NULL,
+        preco REAL NOT NULL,
+        FOREIGN KEY (restaurante_id) REFERENCES restaurantes(id)
+    )
+    ''')
+
+    conn.commit()
+    conn.close()
+criar_banco_de_dados()
+
+
+def login_cadastro():
+    conn = sqlite3.connect('restaurante4')
+    cursor = conn.cursor()
+
+    resp = input('0 - Cadastro\n1 - Login\n')
+    while resp != '0' and resp != '1':
+        resp = (input('Digite uma opção válida!\n0 - Cadastro\n1 - Login\n'))
+    if resp == '0':
+        nome = input('nome do restaurante: ')
+        while len(nome) < 10:
+            nome = input('Digite o nome do restaurante corretamente com mais de 10 caracteres: ')
+        comissao = input('comissao do restaurante: ')
+        while not comissao.isdigit() or int(comissao) <= 0:
+            print('Deve ser apenas numeros e o valor maior ou igual a 0')
+            comissao = input('comissão do restaurante')
+
+        email = input('email do restaurante: ')
+        senha = input('Digite a sua senha: ')
+        email = email.lower()
+
+        while len(senha) < 5 or not re.search(r'[a-z]', senha) or not re.search(r'[A-Z]', senha) or not re.search(r'[0-9]', senha):
+            print("Senha inválida. Ela deve ter pelo menos 5 caracteres.")
+            senha = input('Digite a sua senha: ')
+        print('boa')
+
+        try:
+            cursor.execute('''
+                INSERT INTO restaurantes (nome, comissao, email, senha)
+                VALUES (?, ?, ?, ?)
+                    ''', (nome, int(comissao), email, senha))
+            conn.commit()
+            print('Cadastro realizado com sucesso!')
+        except sqlite3.IntegrityError:
+            print('Erro: Email já cadastrado.')
+
+    else:
+        login_email = input('Digite seu email: ')
+        login_senha = input('Digite sua senha: ')
+
+        cursor.execute('''SELECT id ,nome ,comissao ,email ,senha FROM restaurantes WHERE email = ? AND senha = ?
+        ''', (login_email, login_senha))
+
+        usuario = cursor.fetchone()
+        print(usuario)
+
+        if usuario:
+            print(f'Login realizado com sucesso! {usuario[1]}.')
+        else:
+            print('Email ou senha incorretos. Tente novamente.')
+
+    conn.close()
+
+login_cadastro()
+
+
+def banco_produtos():
+    conn = sqlite3.connect('restaurante4')  # Use a extensão .db para o banco de dados SQLite
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS produtos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            restaurante_id INTEGER,
+            nome_produto TEXT NOT NULL,
+            preco REAL NOT NULL,
+            FOREIGN KEY (restaurante_id) REFERENCES restaurantes(id)
+        );
+    ''')
+
+    conn.commit()
+    conn.close()
+
+def cadastro_produtos():
+    conn = sqlite3.connect('restaurante4')
+    cursor = conn.cursor()
+
+    resposta = input('1 - Cadastro do produto\n2 - Apagar produto \n3 - Alterar comissão\n4 - Logout\n')
+    while resposta not in ['1', '2', '3', '4']:
+        print('Digite uma resposta válida!')
+        resposta = input('1 - Cadastro do produto\n2 - Apagar produto \n3 - Alterar comissão\n4 - Logout\n')
+
+    if resposta == '1':
+        print('Cadastro do produto')
+        nome = input('Digite o nome do produto:\n ')
+        while len(nome) < 5 or not nome.isalpha():
+            nome = input('Digite o nome do produto (mínimo 5 letras e apenas alfabético):\n ')
+
+        while True:
+            preco = input('Digite o preço do produto:\n ')
+            try:
+                preco = float(preco)
+                if preco < 0:
+                    print("O preço não pode ser negativo. Tente novamente.")
+                else:
+                    break
+            except ValueError:
+                print("Por favor, digite um número válido.")
+
+        # Inserindo o produto no banco de dados
+        cursor.execute('''
+            INSERT INTO produtos (nome, preco)
+            VALUES (?, ?)
+        ''', (nome, preco))
+
+        conn.commit()
+        print(f"O produto '{nome}' foi cadastrado com o preço de R$ {preco:.2f}")
+        conn.close()
+
+    elif resposta == '2':
+        conn = sqlite3.connect('restaurante4')
+        cursor = conn.cursor()
+
+        deletar_nome = input('Qual produto você deseja deletar? Digite o nome: ')
+
+        cursor.execute('SELECT * FROM produtos WHERE nome = ?', (deletar_nome,))
+        produto = cursor.fetchone()
+
+        if produto:
+            confirmacao = input(f'Tem certeza de que deseja deletar o produto {produto[2]} (ID: {produto[0]})? (s/n): ')
+            if confirmacao.lower() == 's':
+                cursor.execute('DELETE FROM produtos WHERE nome = ?', (deletar_nome,))
+                conn.commit()
+                print(f'Produto {produto[2]} deletado com sucesso!')
+            else:
+                print('Ação de exclusão cancelada.')
+        else:
+            print('Produto não encontrado.')
+
+        conn.close()
+    elif resposta == '3':
+        conn = sqlite3.connect('restaurante4')
+        cursor = conn.cursor()
+
+        valor_comissao = input('Digite o valor da nova comissão: ')
+        while not valor_comissao.isdigit() or int(valor_comissao) < 0:
+            print('O valor deve ser um número e maior ou igual a 0.')
+            valor_comissao = input('Digite o novo valor da comissão: ')
+        valor_comissao = int(valor_comissao)
+
+        cursor.execute('SELECT * FROM restaurantes')
+        mudar_comissao = cursor.fetchone()
+
+        if mudar_comissao:
+            confirmacao = input(f'Tem certeza de que deseja mudar a comissão do produto ? (s/n): ')
+            if confirmacao.lower() == 's':
+                cursor.execute('UPDATE restaurantes SET comissao = ? ',(valor_comissao,))
+                conn.commit()
+                print(f'A comissão do foi alterada com sucesso para {valor_comissao}!')
+            else:
+                print('Ação de exclusão cancelada.')
+        else:
+            print('Produto não encontrado.')
+
+
+
+
+# Criar a tabela no banco de dados
+banco_produtos()
+
+# Cadastrar produtos
+cadastro_produtos()
