@@ -1,0 +1,256 @@
+import re
+import sqlite3
+from datetime import datetime
+
+
+def criar_banco_de_dados():
+    conn = sqlite3.connect('restaurante4')
+    cursor = conn.cursor()
+
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS restaurantes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        comissao INTEGER NOT NULL,
+        email TEXT NOT NULL UNIQUE,
+        senha TEXT NOT NULL,
+        data DATE
+    )
+    ''')
+
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS produtos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        restaurante_id INTEGER,
+        nome TEXT NOT NULL,
+        preco REAL NOT NULL,
+        FOREIGN KEY (restaurante_id) REFERENCES restaurantes(id)
+    )
+    ''')
+
+    conn.commit()
+    conn.close()
+
+
+def login_cadastro():
+    conn = sqlite3.connect('restaurante4')
+    cursor = conn.cursor()
+
+    logged_in = False
+    current_restaurant_id = None
+    quantidade_produtos = 0  # Inicializa a quantidade de produtos
+
+    while not logged_in:
+        resp = input('0 - Cadastro\n1 - Login\n')
+        while resp != '0' and resp != '1':
+            resp = input('Digite uma opção válida!\n0 - Cadastro\n1 - Login\n')
+
+        if resp == '0':
+            nome = input('Nome do restaurante: ')
+            while len(nome) < 10:
+                nome = input('Digite o nome do restaurante corretamente com mais de 10 caracteres: ')
+
+            comissao = input('Comissão do restaurante: ')
+            while not comissao.isdigit() or int(comissao) <= 0:
+                print('Deve ser apenas números e o valor maior que 0.')
+                comissao = input('Comissão do restaurante: ')
+
+            email = input('Email do restaurante: ')
+            while not re.search(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+                email = input('Email do restaurante: ')
+            senha = input('Digite a sua senha: ')
+            senha2 = input('Digite a confirmação da sua senha: ')
+            email = email.lower()
+
+            while len(senha) < 5 or not re.search(r'[a-z]', senha) or not re.search(r'[A-Z]', senha) or not re.search(
+                    r'[0-9]', senha) or senha != senha2:
+                print("Senha inválida. Ela deve ter pelo menos 5 caracteres, contendo letras maiúsculas, minúsculas e números e a senha deve ser igual nas duas etapas.")
+                senha = input('Digite a sua senha: ')
+                print('Confirme sua senha corretamente!')
+                senha2 = input('Digite a sua senha: ')
+
+            try:
+                cursor.execute('''
+                    INSERT INTO restaurantes (nome, comissao, email, senha)
+                    VALUES (?, ?, ?, ?)
+                ''', (nome, int(comissao), email, senha))
+                conn.commit()
+                print('Cadastro realizado com sucesso!')
+            except sqlite3.IntegrityError:
+                print('Erro: Email já cadastrado.')
+
+        else:  # Login
+            login_email = input('Digite seu email: ')
+            login_senha = input('Digite sua senha: ')
+
+            cursor.execute('''SELECT id, nome, comissao, email, senha FROM restaurantes WHERE email = ? AND senha = ?''',
+                           (login_email, login_senha))
+
+            usuario = cursor.fetchone()
+
+            if usuario:
+                print(f'Login realizado com sucesso! Bem-vindo, {usuario[1]}.')
+                logged_in = True
+                current_restaurant_id = usuario[0]  # Armazenar o ID do restaurante logado
+
+                cursor.execute('SELECT data FROM restaurantes WHERE id = ?', (current_restaurant_id,))
+                data_salvo = cursor.fetchone()
+
+                if data_salvo and data_salvo[0]:
+                    data_salvo_datetime = datetime.fromisoformat(data_salvo[0])
+                    data_formatada = data_salvo_datetime.strftime('%d/%m/%Y %H:%M')
+                    print(f'Data do último login: {data_formatada}')
+                else:
+                    print('Primeiro login ou data não disponível.')
+
+                cursor.execute('SELECT id, nome, preco FROM produtos WHERE restaurante_id = ?', (current_restaurant_id,))
+                produtos = cursor.fetchall()
+
+                if produtos:
+                    print("\nProdutos cadastrados:")
+                    print(f"{'ID':<5} {'Nome':<30} {'Preço (R$)':<10}")
+                    print("-" * 50)
+                    for produto in produtos:
+                        id_produto, nome, preco = produto
+                        print(f"{id_produto:<5} {nome:<30} {preco:<10.2f}")
+                    print('-' * 50)
+                    quantidade_produtos = len(produtos)
+                    print(f'Quantidade total de produtos: {quantidade_produtos}\n\n')
+                else:
+                    print('Nenhum produto cadastrado.')
+                    quantidade_produtos = 0
+
+                data_salvo = datetime.now().isoformat()
+
+                cursor.execute('''
+                        UPDATE restaurantes
+                        SET data = ?
+                        WHERE id = ?
+                    ''', (data_salvo, current_restaurant_id))
+
+                conn.commit()
+
+            else:
+                print('Email ou senha incorretos. Tente novamente.')
+
+    conn.close()
+    return current_restaurant_id, quantidade_produtos  # Retorna ambos os valores
+
+
+def cadastro_produtos(restaurante_id):
+    conn = sqlite3.connect('restaurante4')
+    cursor = conn.cursor()
+
+    while True:
+        resposta = input('1 - Cadastro do produto\n2 - Apagar produto\n3 - Alterar comissão\n4 - Logout\n')
+        while resposta not in ['1', '2', '3', '4']:
+            print('Digite uma resposta válida!')
+            resposta = input('1 - Cadastro do produto\n2 - Apagar produto\n3 - Alterar comissão\n4 - Logout\n')
+
+        if resposta == '1':
+            nome = input('Digite o nome do produto:\n ')
+            while len(nome) < 5 or not all(c.isalpha() or c.isspace() for c in nome):
+                nome = input('Digite o nome do produto (mínimo 5 letras e apenas alfabético):\n ')
+
+            while True:
+                preco = input('Digite o preço do produto:\n ')
+                try:
+                    preco = float(preco)
+                    if preco < 0:
+                        print("O preço não pode ser negativo. Tente novamente.")
+                    else:
+                        break
+                except ValueError:
+                    print("Por favor, digite um número válido.")
+
+            # Inserindo o produto no banco de dados
+            cursor.execute('''
+                INSERT INTO produtos (restaurante_id, nome, preco)
+                VALUES (?, ?, ?)
+            ''', (restaurante_id, nome, preco))
+
+            conn.commit()
+            print(f"O produto '{nome}' foi cadastrado com o preço de R$ {preco:.2f}")
+
+        elif resposta == '2':
+
+            cursor.execute('SELECT id, nome, preco FROM produtos WHERE restaurante_id = ?', (restaurante_id,))
+            produtos = cursor.fetchall()
+
+            if produtos:
+                print("\nProdutos cadastrados:")
+                print(f"{'ID':<5} {'Nome':<30} {'Preço (R$)':<10}")
+                print("-" * 50)
+                for produto in produtos:
+                    id_produto, nome, preco = produto
+                    print(f"{id_produto:<5} {nome:<30} {preco:<10.2f}")
+                print('-' * 50)
+                quantidade_produtos = len(produtos)
+                print(f'Quantidade total de produtos: {quantidade_produtos}\n\n')
+
+            deletar_id = int(input('Qual o código do produto que você deseja deletar?: '))
+
+            cursor.execute('SELECT * FROM produtos WHERE id = ? AND restaurante_id = ?',
+                           (deletar_id, restaurante_id))
+            produto = cursor.fetchone()
+
+            if produto:
+                print(f"Produto encontrado: {produto[2]}")
+                confirmacao = input(f'Tem certeza de que deseja deletar o produto ({produto[2]}) (s/n): ')
+                if confirmacao.lower() == 's':
+                    cursor.execute('DELETE FROM produtos WHERE id = ? AND restaurante_id = ?',
+                                   (deletar_id, restaurante_id))
+                    conn.commit()
+                    print(f'Produto {produto[2]} deletado com sucesso!')
+                else:
+                    print('Ação de exclusão cancelada.')
+            else:
+                print('Produto não encontrado ou não pertence a este restaurante.')
+
+        elif resposta == '3':
+            valor_comissao = input('Digite o valor da nova comissão: ')
+            while not valor_comissao.isdigit() or int(valor_comissao) < 0:
+                print('O valor deve ser um número e maior ou igual a 0.')
+                valor_comissao = input('Digite o novo valor da comissão: ')
+            valor_comissao = int(valor_comissao)
+
+            cursor.execute('SELECT * FROM restaurantes WHERE id = ?', (restaurante_id,))
+            mudar_comissao = cursor.fetchone()
+            print('Valor atual da comissão:',mudar_comissao[2])
+
+            if mudar_comissao:
+                confirmacao = input(f'Tem certeza de que deseja mudar a comissão para {valor_comissao}%? (s/n): ')
+                if confirmacao.lower() == 's':
+                    cursor.execute('UPDATE restaurantes SET comissao = ? WHERE id = ?', (valor_comissao, restaurante_id))
+                    conn.commit()
+                    print(f'A comissão foi alterada com sucesso para {valor_comissao}!')
+
+            else:
+                print('Restaurante não encontrado.')
+
+        else:
+            break
+
+    conn.close()
+    return False
+
+
+
+def main():
+    criar_banco_de_dados()
+
+    while True:
+        current_restaurant_id, quantidade_produtos = login_cadastro()
+        if quantidade_produtos > 0:
+            cadastro_produtos(current_restaurant_id)
+        else:
+            print("Nenhum produto cadastrado.")
+            cadastro_produtos(current_restaurant_id)
+
+
+if __name__ == "__main__":
+    main()
+
+
+if __name__ == "__main__":
+    main()
