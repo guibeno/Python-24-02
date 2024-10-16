@@ -1,0 +1,137 @@
+class Node:
+    def __init__(self, value):
+        self.value = value
+        self.next = None
+
+
+class Stack:
+    def __init__(self):
+        self.top = None  # Referência para o topo da pilha
+        #self.length = 0  # Contador para acompanhar o length da pilha
+
+    def __str__(self):
+        valores = []
+        current = self.top
+        while current:
+            valores.append(str(current.value))
+            current = current.next
+        return " -> ".join(valores)
+
+    def push(self, value):
+        new_node = Node(value)  # Criando um novo nó com o valor
+        new_node.next = self.top  # O novo nó aponta para o nó que era o topo
+        self.top = new_node  # O novo nó se torna o topo da pilha
+        #self.length += 1  # Incrementa o length da pilha
+
+    def pop(self):
+        if self.is_empty():
+            return None
+        value = self.top.value  # Armazena o valor do nó que está no topo
+        self.top = self.top.next  # Atualiza o topo para o próximo nó
+        #self.length -= 1  # Decrementa o length da pilha
+        return value
+
+    def is_empty(self):
+        return self.top is None
+
+    def top_item(self):
+        if self.is_empty():
+            return None
+        return self.top.value
+
+    def stack_length(self):
+        return self.length
+
+
+stack = Stack()
+stack.push(10)
+stack.push(5)
+stack.push(30)
+stack.pop()
+
+
+class Node:
+    def __init__(self, value):
+        self.value = value
+        self.next = None
+
+
+class Queue:
+    def __init__(self):
+        self.head = None  # Referência para o início da fila
+        self.tail = None  # Referência para o final da fila
+        #self.length = 0  # Contador para o tamanho da fila
+
+    def __str__(self):
+        valores = []
+        current = self.head
+        while current:
+            valores.append(str(current.value))
+            current = current.next
+        return " -> ".join(valores)
+
+    def enqueue(self, value,):
+        novo_no = Node(value)  # Cria um novo nó
+        if self.is_empty():
+            self.head = self.tail = (
+                novo_no  # Se estiver vazia, o nó é tanto a cabeça quanto a cauda
+            )
+        else:
+            if self.tail.next > 2:
+                print('numero maximo atingido')
+                return False
+            self.tail.next = novo_no  # O nó atual da cauda aponta para o novo nó
+            self.tail = novo_no  # O novo nó se torna a cauda
+        #self.length += 1
+
+    def dequeue(self):
+        if self.is_empty():
+            return None
+        value = self.head.value  # Armazena o value do nó que está na cabeça
+        self.head = self.head.next  # Atualiza a cabeça para o próximo nó
+        if (
+            self.head is None
+        ):  # Se a cabeça for None, a fila está vazia e a cauda também deve ser None
+            self.tail = None
+        #self.length -= 1
+        return value
+
+    def is_empty(self):
+        return self.head is None
+
+    def first_value(self):
+        if self.is_empty():
+            print("A fila está vazia.")
+            return None
+        return self.head.value
+
+    def queue_length(self):
+        contador = 0
+        current = self.head
+        while current:
+            contador += 1
+            current = current.next
+        return contador
+
+
+queue = Queue()
+
+queue.enqueue(10)
+print(queue)  # 10
+
+queue.enqueue(20)
+print(queue)  # 10 -> 20
+
+queue.enqueue(30)
+print(queue)  # 10 -> 20 -> 30
+
+print(f"Primeiro da fila: {queue.first_value()}")  # Primeiro da fila: 10
+
+print(f"Tamanho da fila: {queue.queue_length()}")  # Tamanho da fila: 0
+
+print("Desenfileirado: ", queue.dequeue())  # Desenfileirado:  10
+print("Desenfileirado: ", queue.dequeue())  # Desenfileirado:  20
+print("Desenfileirado: ", queue.dequeue())  # Desenfileirado:  30
+print("Desenfileirado: ", queue.dequeue())  # Desenfileirado:  None (fila está vazia)
+
+print(f"Tamanho da fila: {queue.queue_length()}")  # Tamanho da fila: 0
