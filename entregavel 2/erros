@@ -7,5 +7,6 @@
 
 
 FALTA FAZER: criar tabela do carrinho
-2- ordenar restaurantes pela comissão
+2- ordenar restaurantes pela comissão (usar DESC para ordem decrescente)
 3- criar nova tabela itens pedido, e a tabela vendas e o valor total da venda
+4- 0 para logout na exibição dos restaurantes
