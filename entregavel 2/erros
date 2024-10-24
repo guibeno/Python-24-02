@@ -1,6 +1,6 @@
 1 - se não tem restaurante cadastrado cria um loop infinito no login_cliente
 2 - email errado faz quebrar o programa no cadastro_cliente
-
+3 - ao salvar no banco ele salva cada produto como uma venda
 
 
 
