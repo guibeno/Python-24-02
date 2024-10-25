@@ -1,12 +1,10 @@
 1 - se não tem restaurante cadastrado cria um loop infinito no login_cliente
-2 - email errado faz quebrar o programa no cadastro_cliente
-3 - ao salvar no banco ele salva cada produto como uma venda
-4 - ao cadastrar o restaurante ele encerra o programa
+2 - email errado no login cliente faz quebrar o programa no cadastro_cliente
+3 - ao cadastrar o restaurante ele encerra o programa
 
 
 
 
-FALTA FAZER: criar tabela do carrinho
-3- criar nova tabela itens pedido, e a tabela vendas e o valor total da venda
+FALTA FAZER: 
 4- 0 para logout na exibição dos restaurantes
 5- printar os itens do carrinho ao completar a venda
