@@ -1,5 +1,5 @@
-1 - se não tem restaurante cadastrado cria um loop infinito no login_cliente
-2 - email errado no login cliente faz quebrar o programa no cadastro_cliente
+
+
 3 - ao cadastrar o restaurante ele encerra o programa
 
 
