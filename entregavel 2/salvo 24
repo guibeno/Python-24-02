@@ -1,0 +1,644 @@
+import re
+import sqlite3
+from datetime import datetime
+import os
+
+
+class Utils:
+    @staticmethod
+    def clear_screen():
+        os.system('cls' if os.name == 'nt' else 'clear')
+
+class ReturnToMain(Exception):
+    """Exceção personalizada para retornar à função main."""
+    pass
+
+class ReturnToCatalogo(Exception):
+    pass
+
+
+
+class BancoDeDados:
+    def __init__(self, nome_banco=' restaurante4'):  #conectando com o banco de dados
+        self.conn = sqlite3.connect(nome_banco)
+        self.cursor = self.conn.cursor()
+
+    def criar_banco_de_dados(self): #criando as tabelas restaurantes e produtos
+        self.cursor.execute('''
+        CREATE TABLE IF NOT EXISTS restaurantes (  
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            comissao INTEGER NOT NULL,
+            email TEXT NOT NULL UNIQUE,
+            senha TEXT NOT NULL,
+            data DATE
+        )
+        ''')
+
+        self.cursor.execute('''
+        CREATE TABLE IF NOT EXISTS produtos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            restaurante_id INTEGER,
+            nome TEXT NOT NULL,
+            preco REAL NOT NULL,
+            FOREIGN KEY (restaurante_id) REFERENCES restaurantes(id)
+        )
+        ''')
+
+        self.cursor.execute('''
+        CREATE TABLE IF NOT EXISTS cadastro_cliente (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT,
+        email TEXT UNIQUE,
+        senha TEXT,
+        data DATE
+        )
+        ''')
+
+        self.cursor.execute('''
+        CREATE TABLE IF NOT EXISTS vendas(
+        id_cliente INTEGER,
+        venda_id INTEGER,
+        id_produto INTEGER,
+        nome_produto TEXT,
+        momento_compra DATE,
+        quantidade INTEGER ,
+        preco_total REAL,
+        FOREIGN KEY (id_cliente) REFERENCES cadastro_cliente(id)
+
+        )
+        ''')
+
+        self.conn.commit()
+
+    def fechar_conexao(self):
+        self.conn.close()
+
+
+class Restaurante:
+    def __init__(self, banco):
+        self.banco = banco
+        self.logged_in = False
+        self.current_restaurant_id = None
+        self.current_cliente_id = None
+        self.quantidade_produtos = 0  # Inicializa a quantidade de produtos
+        self.carrinho = []
+        self.cursor = self.banco.cursor  # Inicializa o cursor
+
+
+    def login_cadastro(self):  #função do login ou cadastro do usuario
+        while not self.logged_in:
+            resp = input('0 - Cadastro\n1 - Login\n2 - Voltar ao menu anterior\nDigite um valor: ')
+            while resp != '0' and resp != '1' and resp != '2':
+                resp = input('Digite uma opção válida!\n0 - Cadastro\n1 - Login\n2 - Para voltar ao menu anterior')
+
+            if resp == '0':
+                self.cadastrar_restaurante()
+            elif resp == '2':
+                return None
+            else:
+                self.fazer_login()
+
+        return self.current_restaurant_id, self.quantidade_produtos
+
+    def cadastrar_restaurante(self):
+        nome = input('Nome do restaurante (deve ter mais de 10 caracteres): ')
+        while len(nome) <= 10:  #nome do restaurante com pelo menos 10 caracteres
+            nome = input('Digite o nome do restaurante corretamente com mais de 10 caracteres: ')
+
+        comissao = input('Comissão do restaurante (valor entre 0 e 70): ')
+        while not comissao.isdigit() or int(comissao) <= 0 or int(comissao) > 70:  #comissao com um valor entre 0 e 70
+            print('Deve ser apenas números e o valor maior que 0.')
+            comissao = input('Comissão do restaurante (valor entre 0 e 70): ')
+
+        email = input('Email do restaurante: ')  #email em formato convencional com @ e .%% no final
+        while not re.search(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+            email = input('Email do restaurante: ')
+        senha = input('Digite a sua senha: ')
+        senha2 = input('Digite a confirmação da sua senha: ')
+        email = email.lower()
+
+        while len(senha) < 5 or not re.search(r'[a-z]', senha) or not re.search(r'[A-Z]', senha) or not re.search(
+                r'[0-9]', senha) or senha != senha2:  #senha com verificação através do regex, com letra maiuscula, minuscula e numero.
+            print("Senha inválida. Ela deve ter pelo menos 5 caracteres, contendo letras maiúsculas, minúsculas e números e a senha deve ser igual nas duas etapas.")
+            senha = input('Digite a sua senha: ') #incluido uma verificação de duas senha para que o usuario não escreva uma senha não desejada sem querer
+            print('Confirme sua senha corretamente!')
+            senha2 = input('Digite a sua senha: ')
+
+        try: # insere os dados no banco
+            self.banco.cursor.execute('''
+                INSERT INTO restaurantes (nome, comissao, email, senha) 
+                VALUES (?, ?, ?, ?)
+            ''', (nome, int(comissao), email, senha))
+            self.banco.conn.commit()
+            print('Cadastro realizado com sucesso!')
+        except sqlite3.IntegrityError: # exclui a chance de quebra através de um except
+            print('Erro: Email já cadastrado.')
+
+    def fazer_login(self):
+        login_email = input('Digite seu email: ')
+        login_senha = input('Digite sua senha: ')
+
+        self.banco.cursor.execute(
+            '''SELECT id, nome, comissao, email, senha FROM restaurantes WHERE email = ? AND senha = ?''',
+            (login_email, login_senha))
+
+        usuario = self.banco.cursor.fetchone()  # busca o nome do restaurante no banco para dar as boas vindas ao logar
+
+        if usuario:
+            print(f'Login realizado com sucesso! Bem-vindo, {usuario[1]}.')
+            self.logged_in = True
+            self.current_restaurant_id = usuario[0]
+
+            self.banco.cursor.execute('SELECT data FROM restaurantes WHERE id = ?', (self.current_restaurant_id,))
+            data_salvo = self.banco.cursor.fetchone()
+
+            if data_salvo and data_salvo[0]:  # busca a data do banco e formata para imprimir na tela
+                data_salvo_datetime = datetime.fromisoformat(data_salvo[0])
+                data_formatada = data_salvo_datetime.strftime('%d/%m/%Y %H:%M')
+                print(f'Data do último login: {data_formatada}')
+            else: # caso a data esteja nula, imprime o erro de primeiro login ou data indisponivel
+                print('Primeiro login ou data não disponível.')
+
+            self.banco.cursor.execute('SELECT id, nome, preco FROM produtos WHERE restaurante_id = ?',
+                                      (self.current_restaurant_id,))
+            produtos = self.banco.cursor.fetchall()
+
+
+            Utils.clear_screen()
+
+            if produtos:  # armazena em produtos os produtos cadastrados e formata em forma tabular.
+                print("\nProdutos cadastrados:")
+                print(f"{'ID':<5} {'Nome':<30} {'Preço (R$)':<10}")
+                print("-" * 50)
+                for produto in produtos:
+                    id_produto, nome, preco = produto
+                    print(f"{id_produto:<5} {nome:<30} {preco:<10.2f}")
+                print('-' * 50)
+                self.quantidade_produtos = len(produtos) #Foi usado a quantidade de protudos que le o tamanho de produtos e imprime a qtd de produtos cadastrados
+                print(f'Quantidade total de produtos: {self.quantidade_produtos}\n\n')
+            else:
+                print('\nNenhum produto cadastrado.')  #retorna produto = 0 se nenhum produto cadastrado
+                self.quantidade_produtos = 0
+
+            data_salvo = datetime.now().isoformat()
+
+            self.banco.cursor.execute('''
+                    UPDATE restaurantes
+                    SET data = ?
+                    WHERE id = ?
+                ''', (data_salvo, self.current_restaurant_id))
+
+            self.banco.conn.commit()
+
+        else:
+            print('Email ou senha incorretos. Tente novamente.')
+
+    def cadastro_cliente(self):
+        print('\nVocê está na area de cadastro do cliente\n1 - login\n2 - cadastro\n3 - Voltar ao menu anterior')
+        resp2 = input()
+        while resp2 != '1' and resp2 != '2' and resp2 != '3':
+            resp2 = input('digite um valor entre 1, 2 e 3: ')
+        if resp2 == '2':
+            nome = input('Nome(deve ter mais de 10 caracteres): ')
+            while len(nome) <= 10:  # nome do restaurante com pelo menos 10 caracteres
+                nome = input('Digite o nome do restaurante corretamente com mais de 10 caracteres: ')
+
+            email = input('Digite seu email: ')  # email em formato convencional com @ e .%% no final
+            while not re.search(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+                email = input('Email do restaurante: ')
+
+            senha = input('Digite a sua senha: ')
+            senha2 = input('Digite a confirmação da sua senha: ')
+            email = email.lower()
+
+            while len(senha) < 5 or not re.search(r'[a-z]', senha) or not re.search(r'[A-Z]', senha) or not re.search(
+                    r'[0-9]',
+                    senha) or senha != senha2:  # senha com verificação através do regex, com letra maiuscula, minuscula e numero.
+                print(
+                    "Senha inválida. Ela deve ter pelo menos 5 caracteres, contendo letras maiúsculas, minúsculas e números e a senha deve ser igual nas duas etapas.")
+                senha = input(
+                    'Digite a sua senha: ')  # incluido uma verificação de duas senha para que o usuario não escreva uma senha não desejada sem querer
+                print('Confirme sua senha corretamente!')
+                senha2 = input('Digite a sua senha: ')
+
+            try:  # insere os dados no banco
+                self.banco.cursor.execute('''
+                    INSERT INTO cadastro_cliente (nome, email, senha) 
+                    VALUES (?, ?, ?)
+                ''', (nome, email, senha))
+                self.banco.conn.commit()
+                print('Cadastro realizado com sucesso!')
+                self.cadastro_cliente()
+            except sqlite3.IntegrityError:  # exclui a chance de quebra através de um except
+                print('Erro: Email já cadastrado.')
+                self.cadastro_cliente()
+        elif resp2 == '3':
+            raise ReturnToMain
+
+
+        else:
+            login_email = input('Digite seu email: ')
+            login_senha = input('Digite sua senha: ')
+
+            # Consulta ao banco de dados para buscar o usuário
+            self.banco.cursor.execute(
+                '''SELECT id, nome, email, senha FROM cadastro_cliente WHERE email = ? AND senha = ?''',
+                (login_email, login_senha)
+            )
+
+            usuario = self.banco.cursor.fetchone()  # Busca o usuário
+
+            if usuario is not None:
+                self.current_cliente_id = usuario[0]  # Armazena o ID do cliente
+                # Continue com o fluxo normal...
+            else:
+                print("Email ou senha incorretos. Tente novamente.")
+                self.cadastro_cliente()  # Chama o método de cadastro
+
+            resp3 = 1
+            while resp3 != 0:
+                print(f'Login realizado com sucesso! Bem-vindo, {usuario[1]}.')
+                momento_login = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                self.banco.cursor.execute('INSERT INTO cadastro_cliente(data) VALUES (?)',
+                                          (momento_login,)
+                )
+                # Busca todos os restaurantes cadastrados
+                self.banco.cursor.execute('SELECT id, nome FROM restaurantes ORDER BY comissao DESC')
+                restaurantes = self.banco.cursor.fetchall()
+
+                # Limpa a tela e exibe os restaurantes
+                Utils.clear_screen()
+
+                if restaurantes:
+                    print("Restaurantes disponíveis:")
+                    print(f"{'ID':<5} {'Nome':<30}")
+                    print("-" * 50)
+                    for id_restaurante, nome in restaurantes:
+                        print(f"{id_restaurante:<5} {nome:<30}")
+                    print('-' * 50)
+                    print('0 - Para voltar ao menu anterior\n')
+
+
+                    # Solicita ao cliente que escolha um restaurante pelo ID
+                    restaurante_id = input("Digite o ID do restaurante que deseja escolher: ")
+                    if restaurante_id == '0':
+                        self.cadastro_cliente()
+                    # Valida a entrada do usuário
+                    if restaurante_id.isdigit() and int(restaurante_id) in [id_restaurante for id_restaurante, _ in
+                                                                            restaurantes]:
+                        self.current_restaurant_id = int(restaurante_id)
+                        print(f"Restaurante escolhido: {restaurante_id}")
+
+                        # Aqui você pode chamar a função que exibe os produtos desse restaurante
+                        self.exibir_produtos()
+                        resp3 = 0
+                    else:
+                        print("ID de restaurante inválido. Tente novamente.")
+                        resp3 = 1
+                else:
+                    print("\nNenhum restaurante cadastrado, pedimos desculpas.\nVolte sempre!!")
+                    self.cadastro_cliente()
+
+    def exibir_produtos(self):
+        if self.current_restaurant_id is not None:
+            try:
+                self.banco.cursor.execute(
+                    'SELECT id, nome, preco FROM produtos WHERE restaurante_id = ?',
+                    (self.current_restaurant_id,))
+                produtos = self.banco.cursor.fetchall()
+
+                Utils.clear_screen()
+
+                if produtos:
+                    print('Bem vindo ao carrinho de pedidos\n')
+                else:
+                    print("Nenhum produto cadastrado para este restaurante.")
+                    return
+
+            except sqlite3.Error as e:
+                print(f'Ocorreu um erro ao buscar os produtos: {e}')
+                return
+
+            # Loop para gerenciar o carrinho
+            while True:
+                print("\nProdutos disponíveis:")
+                print(f"{'ID':<5} {'Nome':<30} {'Preço (R$)':<10}")
+                print("-" * 50)
+
+                for id_produto, nome, preco in produtos:
+                    print(f"{id_produto:<5} {nome:<30} {preco:<10.2f}")
+
+                print('-' * 50)
+
+                print('\nQual produto você deseja? (Digite "A" para voltar ou "F" para finalizar a venda)')
+                entrada = input().strip()
+
+                if entrada.upper() == 'A':
+                    print("Voltando à lista de restaurantes...")
+                    raise ReturnToMain()
+
+
+                elif entrada.upper() == 'F':
+
+                    if self.carrinho:
+
+                        # Calcula o subtotal somando os preços dos produtos no carrinho
+
+                        subtotal = sum(item[3] for item in self.carrinho)  # item[3] é o preço total de cada produto
+                        self.finalizar_venda(subtotal,self.current_cliente_id,self.current_restaurant_id,)
+                        # Chama finalizar_venda passando o subtotal
+
+                        return  # Após finalizar a venda, retorna
+
+                    else:
+
+                        print("O carrinho está vazio. Não é possível finalizar a venda.")
+
+                elif entrada.isnumeric():
+                    produto_id = int(entrada)
+
+                    # Verifica se o ID do produto está na lista de produtos
+                    for id_produto, nome, preco in produtos:
+                        if produto_id == id_produto:
+                            quantidade_desejada = input('Digite a quantidade desejada: ').strip()
+
+                            # Garantir que a entrada da quantidade seja um número válido
+                            while not quantidade_desejada.isdigit():
+                                quantidade_desejada = input('Por favor, insira uma quantidade válida: ').strip()
+
+                            quantidade_desejada = int(quantidade_desejada)
+
+                            # Verificar se a quantidade desejada é 0
+                            if quantidade_desejada == 0:
+                                # Se a quantidade for 0, remover o item do carrinho (se já estiver no carrinho)
+                                for i, (item_id, item_nome, item_quantidade, item_preco) in enumerate(self.carrinho):
+                                    if item_id == produto_id:
+                                        self.carrinho.pop(i)
+                                        print(f"{item_nome} foi removido do carrinho.")
+                                        break
+                                else:
+                                    # Se o produto não estava no carrinho, informar que não foi adicionado
+                                    print(f"{nome} não foi adicionado ao carrinho, pois a quantidade é 0.")
+                                continue  # Voltar ao início do loop para nova interação sem adicionar ao carrinho
+
+                            # Verificar se o produto já está no carrinho
+                            for i, (item_id, item_nome, item_quantidade, item_preco) in enumerate(self.carrinho):
+                                if item_id == produto_id:
+                                    # Somar a nova quantidade com a quantidade existente
+                                    nova_quantidade = item_quantidade + quantidade_desejada
+                                    novo_preco = nova_quantidade * preco
+                                    self.carrinho[i] = (item_id, item_nome, nova_quantidade, novo_preco)
+                                    print(f"A quantidade de {item_nome} foi atualizada para {nova_quantidade}.")
+                                    break
+                            else:
+                                preco_total = quantidade_desejada * preco
+                                self.carrinho.append((produto_id, nome, quantidade_desejada, preco_total))
+                                print(f"{nome} foi adicionado ao carrinho com {quantidade_desejada} unidades.")
+
+                            print('\nProdutos no carrinho:')
+                            print(f"{'Nome':<30} {'Quantidade':<10} {'Preço (R$)':<10}")
+                            print("-" * 50)
+
+                            for item_id, item_nome, item_quantidade, item_preco in self.carrinho:
+                                print(f"{item_nome:<30} {item_quantidade:<10} {item_preco:<10.2f}")
+
+                            # Exibir subtotal do carrinho
+                            subtotal = sum(item[3] for item in self.carrinho)  # Soma o valor total de todos os itens
+                            print('-' * 50)
+                            print(f"Subtotal: {subtotal:.2f} R$")
+                            print('-' * 50)
+
+                            break
+                    else:
+                        print("Produto não encontrado.")
+                else:
+                    print("Por favor, insira um ID de produto válido ou 'A'/'F'.")
+
+    def finalizar_venda(self, subtotal,current_cliente_id,restaurante_id):
+        # Consultar o maior venda_id atual
+        self.cursor.execute('SELECT MAX(venda_id) FROM vendas')
+        resultado = self.cursor.fetchone()[0]
+
+        # Se não houver vendas, comece em 1
+        if resultado is None:
+            resultado =  1
+        else:
+             resultado += 1  # Adiciona 1 ao maior venda_id
+        try:
+            momento_compra = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.banco.cursor.execute('SELECT id, nome FROM restaurantes WHERE id = ?', (restaurante_id,))
+            restaurantes = self.banco.cursor.fetchall()
+
+            # Limpa a tela e exibe os restaurantes
+            Utils.clear_screen()
+
+            print("Restaurante selecionado:")
+            for id_restaurante, nome in restaurantes:
+                print(f"{id_restaurante:<5} {nome:<30}")
+            print('-' * 50)
+
+            print('Produtos totais do carrinho:')
+            print(f"{'Nome':<30} {'Quantidade':<10} {'Preço (R$)':<10}")
+            print("-" * 50)
+
+            for item_id, item_nome, item_quantidade, item_preco in self.carrinho:
+                print(f"{item_nome:<30} {item_quantidade:<10} {item_preco:<10.2f}")
+
+            # Exibir subtotal do carrinho
+            subtotal = sum(item[3] for item in self.carrinho)  # Soma o valor total de todos os itens
+            print('-' * 50)
+            print(f"Total da compra: {subtotal:.2f} R$")
+            print('-' * 50)
+            # Obter o último venda_id inserido
+            venda_id = self.cursor.lastrowid
+
+
+
+            # Inserir os detalhes para cada produto no carrinho
+            for id_produto, nome, quantidade, preco in self.carrinho:
+                preco_total = preco
+                self.cursor.execute('''
+                    INSERT INTO vendas (id_cliente,venda_id, id_produto, nome_produto, momento_compra, quantidade, preco_total)
+                    VALUES (?,?,?, ?, ?, ?, ?)
+                ''', (current_cliente_id,resultado, id_produto, nome, momento_compra, quantidade, preco_total))
+
+            # Confirmar a transação
+            self.banco.conn.commit()
+            print("Venda finalizada com sucesso!\n")
+
+            # Limpar o carrinho após a venda
+            self.carrinho.clear()
+            self.cursor.execute('''
+                                    SELECT venda_id, nome_produto, momento_compra, quantidade, preco_total
+                                    FROM vendas
+                                    WHERE id_cliente = ?
+                                    ORDER BY momento_compra DESC
+                                ''', (current_cliente_id,))
+
+            vendas = self.cursor.fetchall()
+
+            if vendas:
+                print(f"\nVendas do Cliente ID {current_cliente_id}:")
+                print(
+                    f"{'Venda ID':<10} {'Produto':<30} {'Data e Hora':<20} {'Quantidade':<10} {'Preço Total (R$)':<10}")
+                print("-" * 100)
+
+                for venda in vendas:
+                    venda_id, nome_produto, momento_compra, quantidade, preco_total = venda
+                    print(
+                        f"{venda_id:<10} {nome_produto:<30} {momento_compra:<20} {quantidade:<10} {preco_total:<10.2f}")
+
+                print("-" * 100)
+                print('')
+            else:
+                print(f"Nenhuma venda encontrada para o Cliente ID {current_cliente_id}.")
+        except sqlite3.Error as e:
+            print(f'Ocorreu um erro ao buscar as vendas: {e}')
+
+        except sqlite3.Error as e:
+            print(f'Ocorreu um erro ao finalizar a venda: {e}')
+
+
+class Produto:
+    def __init__(self, banco):
+        self.banco = banco
+
+    def cadastro_produtos(self, restaurante_id):
+        while True:
+            resposta = input('1 - Cadastro do produto\n2 - Apagar produto\n3 - Alterar comissão\n4 - Logout\n')
+            while resposta not in ['1', '2', '3', '4']:  # faz com que o usuario apenas possa escolher entre [1,2,3,4]
+                print('Digite uma resposta válida!')
+                resposta = input('1 - Cadastro do produto\n2 - Apagar produto\n3 - Alterar comissão\n4 - Logout\n')
+
+            if resposta == '1':
+                self.cadastrar_produto(restaurante_id)
+            elif resposta == '2':
+                self.apagar_produto(restaurante_id)
+            elif resposta == '3':
+                self.alterar_comissao(restaurante_id)
+            elif resposta == '4':
+                raise ReturnToMain() # sai do lastro para executar o logout
+
+    def cadastrar_produto(self, restaurante_id):
+        nome = input('Digite o nome do produto:\n ')
+        while len(nome) < 5 or not all(c.isalpha() or c.isspace() for c in nome): # exige que o nome do produto tenha 5 ou mais chars, apenas letras e tambem espaco entre as palavra
+            nome = input('Digite o nome do produto (mínimo 5 letras e apenas alfabético):\n ')
+
+        while True:
+            preco = input('Digite o preço do produto:\n ')
+            try:
+                preco = float(preco)
+                if preco < 0:  # confere que o preco inserido seja maior que 0 e que se o preco não seja um valor em float execute o except com a mensagem de erro
+                    print("O preço não pode ser negativo. Tente novamente.")
+                else:
+                    break
+            except ValueError:
+                print("Por favor, digite um número válido.")
+
+        self.banco.cursor.execute('''
+            INSERT INTO produtos (restaurante_id, nome, preco) 
+            VALUES (?, ?, ?)
+        ''', (restaurante_id, nome, preco)) # inseri os dados de nome e preco no banco de dados
+
+        self.banco.conn.commit()
+        print(f"O produto '{nome}' foi cadastrado com o preço de R$ {preco:.2f}\n")
+
+    def apagar_produto(self, restaurante_id):
+        self.banco.cursor.execute('SELECT id, nome, preco FROM produtos WHERE restaurante_id = ?', (restaurante_id,))
+        produtos = self.banco.cursor.fetchall()
+
+        if produtos:  # tabela de produtos
+            print("\nProdutos cadastrados:")
+            print(f"{'ID':<5} {'Nome':<30} {'Preço (R$)':<10}")
+            print("-" * 50)
+            for produto in produtos:
+                id_produto, nome, preco = produto
+                print(f"{id_produto:<5} {nome:<30} {preco:<10.2f}")
+            print('-' * 50)
+            quantidade_produtos = len(produtos)
+            print(f'Quantidade total de produtos: {quantidade_produtos}\n\n')
+
+        deletar_id = input('Qual o código do produto que você deseja deletar?: ')
+        while not deletar_id.isdigit(): # atraves do codigo digitado apaga um produto pelo id no banco de dados. confere se o numero digitado é realmente um digito
+            print('Digite um número válido.')
+            deletar_id = input('Qual o código do produto que você deseja deletar?: ')
+        deletar_id = int(deletar_id)
+
+        self.banco.cursor.execute('SELECT * FROM produtos WHERE id = ? AND restaurante_id = ?',
+                                  (deletar_id, restaurante_id))
+        produto = self.banco.cursor.fetchone()
+
+        if produto:
+            print(f"Produto encontrado: {produto[2]}")  # busca o item 3 da tabela produto
+            confirmacao = input(f'Tem certeza de que deseja deletar o produto ({produto[2]}) (s/n): ')
+            if confirmacao.lower() == 's':
+                self.banco.cursor.execute('DELETE FROM produtos WHERE id = ? AND restaurante_id = ?',
+                                          (deletar_id, restaurante_id))
+                self.banco.conn.commit()
+                print(f'Produto {produto[2]} deletado com sucesso!')  # busca o item 3 da tabela produto
+            else:
+                print('Ação de exclusão cancelada.')
+        else:
+            print('Produto não encontrado ou não pertence a este restaurante.')
+
+    def alterar_comissao(self, restaurante_id):
+        valor_comissao = input('Digite o valor da nova comissão: ')
+        while not valor_comissao.isdigit() or int(valor_comissao) < 0 or int(valor_comissao) > 70:
+            print('O valor deve ser um número e entre 0 e 70.')
+            valor_comissao = input('Digite o novo valor da comissão: ')
+        valor_comissao = int(valor_comissao)
+
+        self.banco.cursor.execute('SELECT * FROM restaurantes WHERE id = ?', (restaurante_id,))
+        mudar_comissao = self.banco.cursor.fetchone()  # busca o valor da comissão e salva na variavel mudar_comissao
+        print('Valor atual da comissão:', mudar_comissao[2], '%') # busca o item 3 da tabela restaurante
+
+        if mudar_comissao:
+            confirmacao = input(f'Tem certeza de que deseja mudar a comissão para {valor_comissao}%? (s/n): ')
+            if confirmacao.lower() == 's':  # pede para o usario consirmar mudar a comissao
+                self.banco.cursor.execute('UPDATE restaurantes SET comissao = ? WHERE id = ?',
+                                          (valor_comissao, restaurante_id))
+                self.banco.conn.commit()
+                print(f'\nA comissão foi alterada com sucesso para {valor_comissao}!\n')
+        else:
+            print('Restaurante não encontrado.')
+
+
+def main():
+    banco = BancoDeDados()
+    banco.criar_banco_de_dados()
+
+    while True:  # Mantém o menu principal em um loop
+        print('--- TELA INICIAL ---')
+        resp1 = input('1 - Cliente\n2 - Restaurante\n3 - Encerrar o programa\n')
+        while resp1 not in ['1', '2', '3']:
+            resp1 = input('1 - Cliente\n2 - Restaurante\n3 - Encerrar o programa\n')
+
+        if resp1 == '3':
+            print("Saindo do programa.")
+            break  # Sai do loop e finaliza o programa
+
+        if resp1 == '2':
+            restaurante = Restaurante(banco)
+            while True:
+                try:
+                    result = restaurante.login_cadastro()
+                    if result is None:  # Se o usuário escolher voltar ao menu anterior
+                        break  # Sai do loop e volta ao menu principal
+                    current_restaurant_id, quantidade_produtos = result
+                    produto = Produto(banco)
+                    produto.cadastro_produtos(current_restaurant_id)
+                except ReturnToMain:
+                    break
+        else:
+            restaurante = Restaurante(banco)
+            while True:
+                try:
+                    restaurante.cadastro_cliente()
+                except ReturnToMain:
+                    break
+
+
+if __name__ == "__main__":
+    main()
