@@ -1,0 +1,104 @@
+from utils.utils import Utils, ReturnToMain, ReturnToCatalogo
+
+class Produto:
+    def __init__(self, banco):
+        self.banco = banco
+
+    def cadastro_produtos(self, restaurante_id):
+        while True:
+            resposta = input('1 - Cadastro do produto\n2 - Apagar produto\n3 - Alterar comissão\n4 - Logout\n')
+            while resposta not in ['1', '2', '3', '4']:  # faz com que o usuario apenas possa escolher entre [1,2,3,4]
+                print('Digite uma resposta válida!')
+                resposta = input('1 - Cadastro do produto\n2 - Apagar produto\n3 - Alterar comissão\n4 - Logout\n')
+
+            if resposta == '1':
+                self.cadastrar_produto(restaurante_id)
+            elif resposta == '2':
+                self.apagar_produto(restaurante_id)
+            elif resposta == '3':
+                self.alterar_comissao(restaurante_id)
+            elif resposta == '4':
+                raise ReturnToMain() # sai do lastro para executar o logout
+
+    def cadastrar_produto(self, restaurante_id):
+        nome = input('Digite o nome do produto:\n ')
+        while len(nome) < 5 or not all(c.isalpha() or c.isspace() for c in nome): # exige que o nome do produto tenha 5 ou mais chars, apenas letras e tambem espaco entre as palavra
+            nome = input('Digite o nome do produto (mínimo 5 letras e apenas alfabético):\n ')
+
+        while True:
+            preco = input('Digite o preço do produto:\n ')
+            try:
+                preco = float(preco)
+                if preco <= 0:  # confere que o preco inserido seja maior que 0 e que se o preco não seja um valor em float execute o except com a mensagem de erro
+                    print("O preço não pode ser negativo ou nulo. Tente novamente.")
+                else:
+                    break
+            except ValueError:
+                print("Por favor, digite um número válido.")
+
+        self.banco.cursor.execute('''
+            INSERT INTO produtos (restaurante_id, nome, preco) 
+            VALUES (?, ?, ?)
+        ''', (restaurante_id, nome, preco)) # inseri os dados de nome e preco no banco de dados
+
+        self.banco.conn.commit()
+        print(f"O produto '{nome}' foi cadastrado com o preço de R$ {preco:.2f}\n")
+
+    def apagar_produto(self, restaurante_id):
+        self.banco.cursor.execute('SELECT id, nome, preco FROM produtos WHERE restaurante_id = ?', (restaurante_id,))
+        produtos = self.banco.cursor.fetchall()
+
+        if produtos:  # tabela de produtos
+            print("\nProdutos cadastrados:")
+            print(f"{'ID':<5} {'Nome':<30} {'Preço (R$)':<10}")
+            print("-" * 50)
+            for produto in produtos:
+                id_produto, nome, preco = produto
+                print(f"{id_produto:<5} {nome:<30} {preco:<10.2f}")
+            print('-' * 50)
+            quantidade_produtos = len(produtos)
+            print(f'Quantidade total de produtos: {quantidade_produtos}\n\n')
+
+        deletar_id = input('Qual o código do produto que você deseja deletar?: ')
+        while not deletar_id.isdigit(): # atraves do codigo digitado apaga um produto pelo id no banco de dados. confere se o numero digitado é realmente um digito
+            print('Digite um número válido.')
+            deletar_id = input('Qual o código do produto que você deseja deletar?: ')
+        deletar_id = int(deletar_id)
+
+        self.banco.cursor.execute('SELECT * FROM produtos WHERE id = ? AND restaurante_id = ?',
+                                  (deletar_id, restaurante_id))
+        produto = self.banco.cursor.fetchone()
+
+        if produto:
+            print(f"Produto encontrado: {produto[2]}")  # busca o item 3 da tabela produto
+            confirmacao = input(f'Tem certeza de que deseja deletar o produto ({produto[2]}) (s/n): ')
+            if confirmacao.lower() == 's':
+                self.banco.cursor.execute('DELETE FROM produtos WHERE id = ? AND restaurante_id = ?',
+                                          (deletar_id, restaurante_id))
+                self.banco.conn.commit()
+                print(f'Produto {produto[2]} deletado com sucesso!')  # busca o item 3 da tabela produto
+            else:
+                print('Ação de exclusão cancelada.')
+        else:
+            print('Produto não encontrado ou não pertence a este restaurante.')
+
+    def alterar_comissao(self, restaurante_id):
+        valor_comissao = input('Digite o valor da nova comissão: ')
+        while not valor_comissao.isdigit() or int(valor_comissao) < 0 or int(valor_comissao) > 100:
+            print('O valor deve ser um número e entre 0 e 100.')
+            valor_comissao = input('Digite o novo valor da comissão: ')
+        valor_comissao = int(valor_comissao)
+
+        self.banco.cursor.execute('SELECT * FROM restaurantes WHERE id = ?', (restaurante_id,))
+        mudar_comissao = self.banco.cursor.fetchone()  # busca o valor da comissão e salva na variavel mudar_comissao
+        print('Valor atual da comissão:', mudar_comissao[2], '%') # busca o item 3 da tabela restaurante
+
+        if mudar_comissao:
+            confirmacao = input(f'Tem certeza de que deseja mudar a comissão para {valor_comissao}%? (s/n): ')
+            if confirmacao.lower() == 's':  # pede para o usario consirmar mudar a comissao
+                self.banco.cursor.execute('UPDATE restaurantes SET comissao = ? WHERE id = ?',
+                                          (valor_comissao, restaurante_id))
+                self.banco.conn.commit()
+                print(f'\nA comissão foi alterada com sucesso para {valor_comissao}!\n')
+        else:
+            print('Restaurante não encontrado.')
