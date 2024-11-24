@@ -1,0 +1,654 @@
+from flask import Flask, render_template, request, redirect, url_for, session, flash, g
+from functools import wraps
+from database.banco_de_dados import BancoDeDados
+import sqlite3
+
+app = Flask(__name__)
+app.secret_key = 'sua_chave_secreta'
+
+# Instanciando a classe BancoDeDados
+db = BancoDeDados()
+
+def buscar_produtos_com_status_0():
+    conn, cursor = get_db()  # Desestruturando o retorno de get_db
+    cursor.execute('''
+        SELECT v.venda_id, v.nome_produto, v.quantidade, v.preco_total
+        FROM vendas v
+        WHERE v.status = 0
+    ''')
+    produtos = cursor.fetchall()
+    return produtos
+
+def buscar_produtos_com_status_cancelado():
+    conn, cursor = get_db()  # Desestruturando o retorno de get_db
+    cursor.execute('''
+        SELECT v.venda_id, v.nome_produto, v.quantidade, v.preco_total
+        FROM vendas v
+        WHERE v.status = 0
+    ''')
+    produtos10 = cursor.fetchall()
+    return produtos10
+
+
+
+
+def get_db():
+    if 'db' not in g:
+        g.conn = sqlite3.connect('sistema.db')
+        g.conn.row_factory = sqlite3.Row  # Facilita o acesso a colunas por nome
+        g.cursor = g.conn.cursor()  # Criando o cursor
+    return g.conn, g.cursor  # Retorna tanto a conexão quanto o cursor
+
+
+
+
+# Função para buscar um restaurante por email e senha
+def buscar_restaurante(email, senha):
+    conn, cursor = get_db()
+    cursor.execute('SELECT * FROM restaurantes WHERE email = ? AND senha = ?', (email, senha))
+    return cursor.fetchone()
+
+# Função para proteger rotas e verificar se o usuário está autenticado
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+
+# Rota para exibir a página de login
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form['email']
+        password = request.form['password']
+
+        # Verificando se o email e senha estão corretos
+        usuario = buscar_restaurante(email, password)
+        if usuario:
+            session['user'] = email  # Autentica o usuário
+            session['user_id'] = usuario[0]  # ID do restaurante
+            session['user_nome'] = usuario[1]
+            return redirect(url_for('dashboard'))
+        else:
+            flash('Email ou senha incorretos. Tente novamente.', 'error')
+
+    return render_template('login.html')
+
+# Rota para o dashboard (somente acessível para usuários autenticados)
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    restaurante_id = session['user_id']
+    produtos = buscar_produtos_com_status_0()  # Produtos com status 0 (Pedido novo)
+    produtos2 = buscar_produtos_com_status_1()  # Produtos com status 1 (Completados)
+    produtos3 = buscar_produtos_com_status_2()
+    produtos10 = buscar_produtos_com_status_cancelado()
+
+
+    return render_template('dashboard.html', produtos=produtos, produtos2=produtos2, produtos3=produtos3, produtos10=produtos10)
+
+
+# Rota para fazer logout
+@app.route('/logout')
+def logout():
+    session.pop('user', None)
+    session.pop('user_id', None)
+    return redirect(url_for('login'))
+
+
+@app.teardown_appcontext
+def close_db(error):
+
+    if hasattr(g, 'conn'):
+        g.conn.close()
+
+
+@app.route('/alterar_status', methods=['POST'])
+@login_required
+def alterar_status():
+    id_venda = request.form['id_venda']  # Obtém o ID da venda enviado pelo formulário
+
+    if not id_venda.isdigit():  # Verifica se o ID é numérico
+        flash('ID da venda inválido. Deve ser um número.', 'error')
+        return redirect(url_for('dashboard'))
+
+    try:
+        # Obtendo a conexão e o cursor a partir de get_db()
+        conn, cursor = get_db()  # Desestruturando o retorno de get_db()
+
+        cursor.execute(''' 
+            UPDATE vendas
+            SET status = 1
+            WHERE venda_id = ? AND status = 0
+        ''', (id_venda,))
+
+        conn.commit()  # Fazendo o commit para persistir a alteração no banco de dados
+
+        if cursor.rowcount > 0:
+            flash(f"Status do pedido {id_venda} alterado para 'Completado'.", 'success')
+
+        else:
+            flash(f"Pedido com ID {id_venda} não encontrado ou já foi alterado.", 'error')
+
+    except sqlite3.DatabaseError as e:
+        flash(f"Ocorreu um erro ao alterar o status: {e}", 'error')
+
+    return redirect(url_for('dashboard'))
+
+
+
+def buscar_produtos_com_status_1():
+    conn, cursor = get_db()  # Usando get_db para obter a conexão e o cursor
+    cursor.execute('''
+        SELECT v.venda_id, v.nome_produto, v.quantidade, v.preco_total
+        FROM vendas v
+        WHERE v.status = 1
+    ''')
+    produtos2 = cursor.fetchall()
+    return produtos2
+
+
+@app.route('/alterar_status2', methods=['POST'])
+@login_required
+def alterar_status2():
+    id_venda = request.form['id_venda']  # Obtém o ID da venda enviado pelo formulário
+
+    if not id_venda.isdigit():  # Verifica se o ID é numérico
+        flash('ID da venda inválido. Deve ser um número.', 'error')
+        return redirect(url_for('dashboard'))
+
+    try:
+        # Obtendo a conexão e o cursor a partir de get_db()
+        conn, cursor = get_db()  # Desestruturando o retorno de get_db()
+
+        cursor.execute(''' 
+            UPDATE vendas
+            SET status = 2
+            WHERE venda_id = ? AND status = 1
+        ''', (id_venda,))
+
+        conn.commit()  # Fazendo o commit para persistir a alteração no banco de dados
+
+        if cursor.rowcount > 0:
+            flash(f"Status do pedido {id_venda} alterado para 'Completado'.", 'success')
+        else:
+            flash(f"Pedido com ID {id_venda} não encontrado ou já foi alterado.", 'error')
+
+    except sqlite3.DatabaseError as e:
+        flash(f"Ocorreu um erro ao alterar o status: {e}", 'error')
+
+    return redirect(url_for('dashboard'))
+
+
+
+def buscar_produtos_com_status_2():
+    conn, cursor = get_db()  # Usando get_db para obter a conexão e o cursor
+    cursor.execute('''
+        SELECT v.venda_id, v.nome_produto, v.quantidade, v.preco_total
+        FROM vendas v
+        WHERE v.status = 2
+    ''')
+    produtos3 = cursor.fetchall()
+    return produtos3
+
+
+
+@app.route('/alterar_status3', methods=['POST'])
+@login_required
+def alterar_status3():
+    id_venda = request.form['id_venda']  # Obtém o ID da venda enviado pelo formulário
+
+    if not id_venda.isdigit():  # Verifica se o ID é numérico
+        flash('ID da venda inválido. Deve ser um número.', 'error')
+        return redirect(url_for('dashboard'))
+
+    try:
+        # Obtendo a conexão e o cursor a partir de get_db()
+        conn, cursor = get_db()  # Desestruturando o retorno de get_db()
+
+
+
+        # Executa a atualização do status
+        cursor.execute(''' 
+            UPDATE vendas
+            SET status = 3
+            WHERE venda_id = ? AND status = 2
+        ''', (id_venda,))
+
+        conn.commit()  # Fazendo o commit para persistir a alteração no banco de dados
+
+        # Verifica quantas linhas foram afetadas pela atualização
+        if cursor.rowcount > 0:
+            try:
+                # Aqui pegamos o nome do cliente diretamente da tabela vendas e não usamos um nome fixo
+                cursor.execute(''' 
+                    INSERT INTO pedidos_concluidos (id_pedido, nome_cliente, total_compra, acoes)
+                    SELECT v.venda_id, c.nome, v.preco_total, 'Pedido Concluído'
+                    FROM vendas v
+                    JOIN cadastro_cliente c ON v.id_cliente = c.id
+                    WHERE v.venda_id = ?
+                ''', (id_venda,))
+
+                # O comando acima insere todos os itens relacionados a um id_venda na tabela pedidos_concluidos
+                conn.commit()  # Certifique-se de fazer o commit para salvar as alterações
+
+            except sqlite3.DatabaseError as e:
+                # Se houver um erro no banco de dados, ele é capturado aqui
+                flash(f"Ocorreu um erro ao inserir os dados: {e}", 'error')
+                return render_template('error.html', error_message=str(e))  # Exibe a página de erro
+
+        else:
+            flash(f"Pedido com ID {id_venda} não encontrado ou já foi alterado.", 'error')
+
+    except sqlite3.DatabaseError as e:
+        conn.rollback()  # Fazendo rollback se ocorrer erro com o banco
+        print(f"Erro ao alterar o status: {e}")
+        flash(f"Ocorreu um erro ao alterar o status: {e}", 'error')
+
+    return redirect(url_for('dashboard'))
+
+
+
+
+@app.route('/alterar_status_cancelado', methods=['POST'])
+@login_required
+def alterar_status_cancelado():
+    id_venda = request.form['id_venda']  # Obtém o ID da venda enviado pelo formulário
+
+    if not id_venda.isdigit():  # Verifica se o ID é numérico
+        flash('ID da venda inválido. Deve ser um número.', 'error')
+        return redirect(url_for('dashboard'))
+
+    try:
+        # Obtendo a conexão e o cursor a partir de get_db()
+        conn, cursor = get_db()  # Desestruturando o retorno de get_db()
+
+        # Tentando atualizar o status do pedido para 'cancelado' (status = 10)
+        cursor.execute(''' 
+            UPDATE vendas
+            SET status = 10 
+            WHERE venda_id = ? AND status = 0  
+        ''', (id_venda,))
+
+        conn.commit()  # Fazendo o commit para persistir a alteração no banco de dados
+
+        # Verificando se a atualização foi bem-sucedida
+        if cursor.rowcount > 0:
+            flash(f"Status do pedido {id_venda} alterado para 'Cancelado'.", 'success')
+
+            try:
+                # Aqui pegamos o nome do cliente diretamente da tabela vendas e não usamos um nome fixo
+                cursor.execute('''
+                    INSERT INTO pedidos_cancelados (id_pedido, nome_cliente, total_compra, acoes)
+                    SELECT v.venda_id, c.nome, v.preco_total, 'Pedido Cancelado'
+                    FROM vendas v
+                    JOIN cadastro_cliente c ON v.id_cliente = c.id
+                    WHERE v.venda_id = ?
+                ''', (id_venda,))
+
+                conn.commit()  # Salvar no banco
+                print(f"Pedido {id_venda} movido para a tabela pedidos_cancelados.")
+            except Exception as e:
+                print(f"Erro ao mover pedido cancelado: {e}")
+        else:
+            flash(f"Pedido com ID {id_venda} não encontrado ou já foi alterado.", 'error')
+
+    except sqlite3.DatabaseError as e:
+        flash(f"Ocorreu um erro ao alterar o status: {e}", 'error')
+
+    return redirect(url_for('dashboard'))
+
+
+
+
+
+
+
+
+
+@app.route('/infos2', methods=['GET'])
+@login_required
+def vendas_info():
+    try:
+        # Obter a conexão e o cursor
+        conn, cursor = get_db()
+
+        # 2. Maior compra (em valor) na tabela 'pedidos_concluidos'
+        cursor.execute(''' 
+            SELECT MAX(total_compra) AS maior_compra
+            FROM pedidos_concluidos
+        ''')
+        maior_compra_row = cursor.fetchone()
+
+        # Verificar se algum valor foi retornado pela consulta
+        if maior_compra_row and maior_compra_row[0] is not None:
+            maior_compra = maior_compra_row[0]
+        else:
+            maior_compra = 0  # Ou pode ser 'Não disponível', dependendo do seu contexto
+
+        # Debugging: Verificar o valor de maior_compra
+
+
+        # Consultar a média de gasto de cada cliente
+        cursor.execute(''' 
+            SELECT nome_cliente, AVG(total_compra) AS media_gasto
+            FROM pedidos_concluidos
+            GROUP BY nome_cliente
+        ''')
+        media_gasto = cursor.fetchall()
+
+
+
+        # 3. Maior pedido (em quantidade de itens)
+        cursor.execute(''' 
+            SELECT id_pedido, COUNT(*) AS quantidade_itens
+            FROM pedidos_concluidos
+            GROUP BY id_pedido
+            ORDER BY quantidade_itens DESC
+            LIMIT 1
+        ''')
+        maior_pedido_row = cursor.fetchone()
+
+        # Verificar se algum valor foi retornado pela consulta
+        if maior_pedido_row:
+            maior_pedido_id = maior_pedido_row[0]  # id_pedido
+            quantidade_itens = maior_pedido_row[1]  # quantidade de itens
+        else:
+            maior_pedido_id = None
+            quantidade_itens = 0  # Caso não haja pedidos
+
+
+
+        cursor.execute(''' 
+                    SELECT 
+                        CASE 
+                            WHEN status = 0 THEN 'Aceitar Pedido'
+                            WHEN status = 1 THEN 'Despachar Pedido'
+                            WHEN status = 2 THEN 'Pedido Entregue'
+                            WHEN status = 3 THEN 'Pedido Concluído'
+                            WHEN status = 10 THEN 'Pedido Cancelado'
+                            ELSE 'Status Desconhecido'
+                        END AS status_nome,
+                        COUNT(*) AS qtd_pedidos
+                    FROM vendas
+                    WHERE status IN (0, 1, 2, 3, 10)
+                    GROUP BY status
+                    ORDER BY status
+                ''')
+        pedidos_por_status = cursor.fetchall()
+
+        # Verificar se retornou algum resultado
+        if not pedidos_por_status:
+            # Garantir que todos os status sejam listados, mesmo que não haja pedidos para alguns
+            pedidos_por_status = [
+                ('Aceitar Pedido', 0),
+                ('Despachar Pedido', 0),
+                ('Pedido Entregue', 0),
+                ('Pedido Concluído', 0),
+                ('Pedido Cancelado', 0)
+            ]
+
+        cursor.execute(''' 
+                    SELECT
+                        strftime('%d/%m/%Y', momento_compra) AS data_compra,
+                        COUNT(CASE WHEN strftime('%w', momento_compra) = '1' THEN 1 END) AS segunda_feira,
+                        COUNT(CASE WHEN strftime('%w', momento_compra) = '2' THEN 1 END) AS terca_feira,
+                        COUNT(CASE WHEN strftime('%w', momento_compra) = '3' THEN 1 END) AS quarta_feira,
+                        COUNT(CASE WHEN strftime('%w', momento_compra) = '4' THEN 1 END) AS quinta_feira,
+                        COUNT(CASE WHEN strftime('%w', momento_compra) = '5' THEN 1 END) AS sexta_feira,
+                        COUNT(CASE WHEN strftime('%w', momento_compra) = '6' THEN 1 END) AS sabado
+                    FROM vendas
+                    WHERE status = 3
+                    GROUP BY data_compra
+                ''')
+        pedidos_por_dia = cursor.fetchall()
+
+        # Verificar se houve dados retornados
+        if not pedidos_por_dia:
+            pedidos_por_dia = []  # Se não houver pedidos, preencher com lista vazia
+
+        # Calcular a quantidade média de pedidos por dia da semana
+        total_pedidos = sum([pedido[1] for pedido in pedidos_por_dia])
+        dias_com_pedidos = len([pedido for pedido in pedidos_por_dia if pedido[1] > 0])
+        if dias_com_pedidos > 0:
+            media_pedidos = total_pedidos / dias_com_pedidos
+        else:
+            media_pedidos = 0  # Caso não haja pedidos em nenhum dia
+
+        cursor.execute(''' 
+                    SELECT id_produto, COUNT(*) AS quantidade_pedidos
+                    FROM vendas
+                    WHERE status = 3
+                    GROUP BY id_produto
+                    ORDER BY quantidade_pedidos DESC
+                    LIMIT 1
+                ''')
+        item_mais_pedido = cursor.fetchone()
+
+        # Verificar se algum item foi retornado
+        if item_mais_pedido:
+            id_produto = item_mais_pedido[0]  # Acessa a primeira coluna (id_produto)
+            quantidade_pedidos = item_mais_pedido[1]  # Acessa a segunda coluna (quantidade_pedidos)
+
+            # Consultar o nome do produto na tabela de produtos
+            cursor.execute(''' 
+                        SELECT nome_produto FROM vendas WHERE id_produto = ?
+                    ''', (id_produto,))
+            produto = cursor.fetchone()
+
+            # Verificar se o produto foi encontrado
+            if produto:
+                nome_produto = produto[0]  # Nome do produto
+            else:
+                nome_produto = 'Desconhecido'  # Caso o produto não seja encontrado
+        else:
+            id_produto = None
+            quantidade_pedidos = 0  # Caso não haja pedidos concluídos
+            nome_produto = 'Desconhecido'
+
+        cursor.execute('''
+            SELECT v.venda_id, v.preco_total, r.comissao
+            FROM vendas v
+            JOIN restaurantes r ON v.id_cliente = r.id
+            WHERE v.status = 3
+        ''')
+
+        vendas_concluidas = cursor.fetchall()
+
+        maior_comissao = 0
+        menor_comissao = float('inf')
+        maior_comissao_venda = None
+        menor_comissao_venda = None
+
+        # 2. Calcular a comissão para cada venda concluída
+        for venda in vendas_concluidas:
+            id_venda, total_compra, comissao_restaurante = venda
+            comissao_pago = total_compra * (comissao_restaurante / 100)  # Comissionamento como percentual
+
+            # Verificar maior comissão
+            if comissao_pago > maior_comissao:
+                maior_comissao = comissao_pago
+                maior_comissao_venda = id_venda
+
+            # Verificar menor comissão
+            if comissao_pago < menor_comissao:
+                menor_comissao = comissao_pago
+                menor_comissao_venda = id_venda
+
+        # Passar as variáveis para o template
+        return render_template('infos2.html',
+                               maior_compra=maior_compra,
+                               media_gasto=media_gasto,
+                               maior_pedido_id=maior_pedido_id,
+                               quantidade_itens=quantidade_itens,
+                               pedidos_por_status=pedidos_por_status,
+                               pedidos_por_dia=pedidos_por_dia,
+                               media_pedidos=media_pedidos,
+                               nome_produto=nome_produto,
+                               id_produto=id_produto,
+                               quantidade_pedidos=quantidade_pedidos,
+                               maior_comissao_venda=maior_comissao_venda,
+                               maior_comissao=maior_comissao,
+                               menor_comissao_venda=menor_comissao_venda,
+                               menor_comissao=menor_comissao)
+
+
+    except sqlite3.DatabaseError as e:
+        # Em caso de erro, exibe uma mensagem de erro e retorna para o template
+        flash(f"Ocorreu um erro ao consultar os dados: {e}", 'error')
+        return render_template('error.html', error_message=str(e))
+
+
+
+
+
+
+@app.route('/infosadministrativo', methods=['GET'])
+@login_required
+def infosadministrativo():
+    try:
+        # Obter a conexão e o cursor
+        conn, cursor = get_db()
+
+        # 1. Quantidade de restaurantes cadastrados
+        cursor.execute(''' 
+            SELECT COUNT(*) AS total_restaurantes
+            FROM restaurantes
+        ''')
+        total_restaurantes_row = cursor.fetchone()
+        total_restaurantes = total_restaurantes_row[0] if total_restaurantes_row else 0
+
+
+        cursor.execute(''' 
+            SELECT COUNT(*) AS total_clientes
+            FROM cadastro_cliente
+        ''')
+        total_clientes_row = cursor.fetchone()
+        total_clientes = total_clientes_row[0] if total_clientes_row else 0
+
+        cursor.execute('''
+                    SELECT c.nome AS cliente, COUNT(DISTINCT v.id_restaurante) AS restaurantes_diferentes
+                    FROM cadastro_cliente c
+                    JOIN vendas v ON c.id = v.id_cliente
+                    WHERE v.status = 3
+                    GROUP BY c.id
+                    ORDER BY c.nome
+                ''')
+
+        # Obter os resultados da consulta
+        resultados = cursor.fetchall()
+
+        cursor.execute('''
+                    SELECT 
+                        r.nome AS nome_restaurante,
+                        v.id_restaurante,
+                        SUM(v.preco_total) AS total_vendas,
+                        COUNT(*) AS total_pedidos,
+                        (SUM(v.preco_total) / COUNT(*)) AS ticket_medio
+                    FROM 
+                        vendas v
+                    JOIN
+                        restaurantes r ON v.id_restaurante = r.id
+                    WHERE 
+                        v.status = 3
+                    GROUP BY 
+                        v.id_restaurante, r.nome
+                ''')
+        resultados_ticket_medio = cursor.fetchall()
+
+        # Organizar os resultados de ticket médio por restaurante
+        ticket_medio_por_restaurante = []
+        for row in resultados_ticket_medio:
+            ticket_medio_por_restaurante.append({
+                "nome_restaurante": row["nome_restaurante"],
+                "id_restaurante": row["id_restaurante"],
+                "total_vendas": round(row["total_vendas"], 2),
+                "total_pedidos": row["total_pedidos"],
+                "ticket_medio": round(row["ticket_medio"], 2)
+            })
+
+        cursor.execute('''
+            SELECT 
+                r.nome AS nome_restaurante,
+                strftime('%Y-%m', v.momento_compra) AS mes,  -- Formato de ano-mês
+                COUNT(*) AS total_pedidos
+            FROM 
+                vendas v
+            JOIN
+                restaurantes r ON v.id_restaurante = r.id
+            WHERE 
+                v.status = 3
+            GROUP BY 
+                r.nome, strftime('%Y-%m', v.momento_compra)
+            ORDER BY 
+                r.nome, mes
+        ''')
+
+        resultados_pedidos = cursor.fetchall()
+
+        # Depuração: Exibir os resultados para ver o que está sendo retornado
+        print("Resultados de pedidos por restaurante e mês:")
+        for row in resultados_pedidos:
+            print(row)
+
+
+
+        # Organizar os resultados em formato de tabela com restaurantes como linhas e meses como colunas
+        pedidos_por_restaurante_mes = {}
+
+        for row in resultados_pedidos:
+            restaurante = row['nome_restaurante']
+            mes = row['mes']
+            total_pedidos = row['total_pedidos']
+
+            if restaurante not in pedidos_por_restaurante_mes:
+                pedidos_por_restaurante_mes[restaurante] = {}
+
+            pedidos_por_restaurante_mes[restaurante][mes] = total_pedidos
+
+        cursor.execute('''
+                   SELECT 
+                       r.nome AS nome_restaurante,
+                       COUNT(DISTINCT v.id_cliente) AS clientes_distintos
+                   FROM 
+                       vendas v
+                   JOIN 
+                       restaurantes r ON v.id_restaurante = r.id
+                   WHERE 
+                       v.status = 3  -- Considerando apenas vendas finalizadas
+                   GROUP BY 
+                       r.nome
+                   ORDER BY 
+                       clientes_distintos DESC  -- Ordena do restaurante com mais clientes distintos
+               ''')
+
+        restaurantes_clientes_distintos = cursor.fetchall()
+
+
+        # Passar as variáveis para o template
+        return render_template('infosadministrativo.html',
+                               total_restaurantes=total_restaurantes,
+                               total_clientes=total_clientes,
+                               resultados=resultados,
+                               ticket_medio_por_restaurante=ticket_medio_por_restaurante,
+                               pedidos_por_restaurante_mes=pedidos_por_restaurante_mes,
+                               restaurantes_clientes_distintos=restaurantes_clientes_distintos)
+
+    except sqlite3.DatabaseError as e:
+        # Em caso de erro, exibe uma mensagem de erro e retorna para o template
+        flash(f"Ocorreu um erro ao consultar os dados: {e}", 'error')
+        return render_template('error.html', error_message=str(e))
+
+
+
+
+
+
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
